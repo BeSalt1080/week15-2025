@@ -1,66 +1,122 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+"use client";
+
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+
+type Post = {
+  id: string;
+  title: string;
+  createdAt: string;
+  author: string;
+};
 
 export default function Home() {
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [sortBy, setSortBy] = useState("createdAt");
+  const [sortOrder, setSortOrder] = useState("desc");
+  const [toastMessage, setToastMessage] = useState("");
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
+  useEffect(() => {
+    const message = searchParams.get("message");
+    if (message) {
+      setToastMessage(message);
+      router.replace("/", { scroll: false });
+      const timer = setTimeout(() => {
+        setToastMessage("");
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [searchParams, router]);
+
+  useEffect(() => {
+    const getPosts = async () => {
+      const res = await fetch(`/api/posts`, {
+        cache: "no-store",
+      });
+      const data = await res.json();
+      setPosts(data);
+    };
+    getPosts();
+  }, []);
+
+  const sortedPosts = [...posts].sort((a, b) => {
+    const aValue = a[sortBy as keyof Post];
+    const bValue = b[sortBy as keyof Post];
+
+    if (aValue < bValue) {
+      return sortOrder === "asc" ? -1 : 1;
+    }
+    if (aValue > bValue) {
+      return sortOrder === "asc" ? 1 : -1;
+    }
+    return 0;
+  });
+
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className={styles.intro}>
-          <h1>To get started, edit the page.tsx file.</h1>
-          <p>
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+    <main className="container mt-4">
+      <h1>Blog Posts</h1>
+      <div className="d-flex justify-content-between align-items-center mb-3">
+        <Link href="/create" className="btn btn-primary">
+          Create Post
+        </Link>
+        <div className="d-flex gap-2">
+          <select
+            className="form-select"
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
           >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className={styles.secondary}
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+            <option value="createdAt">Date</option>
+            <option value="title">Title</option>
+            <option value="author">Author</option>
+          </select>
+          <select
+            className="form-select"
+            value={sortOrder}
+            onChange={(e) => setSortOrder(e.target.value)}
           >
-            Documentation
-          </a>
+            <option value="asc">Asc</option>
+            <option value="desc">Desc</option>
+          </select>
         </div>
-      </main>
-    </div>
+      </div>
+      {sortedPosts.length === 0 ? (
+        <p>No posts yet.</p>
+      ) : (
+        <ul className="list-group">
+          {sortedPosts.map((post) => (
+            <li key={post.id} className="list-group-item">
+              <Link href={`/post/${post.id}`}>{post.title}</Link>
+              <span className="text-muted float-end">
+                {post.author} -{" "}
+                {new Date(post.createdAt).toLocaleDateString("id-ID")}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {toastMessage && (
+        <div
+          className="toast show align-items-center text-bg-success border-0 position-fixed bottom-0 end-0 m-3"
+          role="alert"
+          aria-live="assertive"
+          aria-atomic="true"
+        >
+          <div className="d-flex">
+            <div className="toast-body">{toastMessage}</div>
+            <button
+              type="button"
+              className="btn-close btn-close-white me-2 m-auto"
+              data-bs-dismiss="toast"
+              aria-label="Close"
+              onClick={() => setToastMessage("")}
+            ></button>
+          </div>
+        </div>
+      )}
+    </main>
   );
 }
